@@ -1,0 +1,98 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #0b0d10;
+  --color-bg-2: #101317;
+  --color-surface: #151920;
+  --color-surface-2: #1b2028;
+  --color-line: #262c36;
+  --color-line-2: #313946;
+  --color-ink: #edeff2;
+  --color-ink-2: #b7bdc6;
+  --color-muted: #7f8794;
+  --color-gold: #f2c14e;
+  --color-gold-2: #ffd977;
+  --color-up: #3ddc97;
+  --color-down: #ff6b6b;
+  --font-display: var(--font-display), "Bricolage Grotesque", system-ui, sans-serif;
+  --font-sans: var(--font-sans), "Instrument Sans", system-ui, sans-serif;
+  --font-mono: var(--font-mono), "JetBrains Mono", ui-monospace, monospace;
+  --font-ethiopic: var(--font-ethiopic), "Noto Sans Ethiopic", system-ui, sans-serif;
+}
+
+html {
+  color-scheme: dark;
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-feature-settings: "ss01", "cv11";
+  -webkit-font-smoothing: antialiased;
+}
+
+[lang="am"] body,
+body[data-locale="am"] {
+  font-family: var(--font-ethiopic), var(--font-sans);
+}
+
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+}
+
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.grid-lines {
+  background-image: linear-gradient(to right, var(--color-line) 1px, transparent 1px), linear-gradient(to bottom, var(--color-line) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse at 30% 0%, black 20%, transparent 70%);
+}
+
+.hairline {
+  border-color: var(--color-line);
+}
+
+a {
+  text-underline-offset: 3px;
+}
+
+::selection {
+  background: var(--color-gold);
+  color: #000;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.rise {
+  animation: rise 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+.rise-2 {
+  animation-delay: 0.08s;
+}
+
+.rise-3 {
+  animation-delay: 0.16s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise {
+    animation: none;
+  }
+}

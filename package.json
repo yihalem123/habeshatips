@@ -1,0 +1,52 @@
+{
+  "name": "habeshatips",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Soccer tips from AI strategy rooms with a hashed, publicly settled record.",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "test": "vitest run",
+    "typecheck": "tsc -p pipeline/tsconfig.json && tsc --noEmit",
+    "fetch:fd": "tsx pipeline/data/fetch-football-data.ts",
+    "backtest": "tsx pipeline/backtest/run.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio",
+    "live:daily": "tsx pipeline/live/daily.ts",
+    "live:seed": "tsx pipeline/live/seed-rooms.ts",
+    "live:import-backtest": "tsx pipeline/live/import-backtest.ts",
+    "af:status": "tsx pipeline/live/af-status.ts",
+    "telegram:poll": "tsx pipeline/telegram-poll.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.133.0",
+    "csv-parse": "^7.0.3",
+    "drizzle-orm": "^0.45.4",
+    "next": "16.4.0",
+    "postgres": "^3.4.9",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@tailwindcss/turbopack": "^4",
+    "@types/node": "^22.20.5",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "drizzle-kit": "^0.31.11",
+    "eslint": "^9",
+    "eslint-config-next": "16.4.0",
+    "tailwindcss": "^4",
+    "tsx": "^4.23.15",
+    "typescript": "^5",
+    "vitest": "^5.0.4"
+  },
+  "packageManager": "pnpm@10.34.5"
+}
