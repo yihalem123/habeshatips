@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { Button, Logo } from "@/components/ui";
 import { getLocale, t } from "@/lib/i18n";
 
 export const metadata = { title: "Verify" };
@@ -6,14 +8,19 @@ export default async function VerifyPage({ searchParams }: { searchParams: Promi
   const locale = await getLocale();
   const sp = await searchParams;
   return (
-    <div className="mx-auto max-w-sm px-4 py-16">
-      <h1 className="font-display text-3xl font-semibold">{t(locale, "verify")}</h1>
-      <p className="num mt-2 text-sm text-muted">{sp.phone}</p>
-      <form method="post" action="/api/auth/verify" className="mt-8 space-y-4">
-        <input type="hidden" name="phone" value={sp.phone ?? ""} />
-        <input type="hidden" name="next" value={sp.next ?? "/dashboard"} />
-        <label className="block text-sm">
-          <span className="text-ink-2">{t(locale, "code")}</span>
+    <div className="mx-auto max-w-[520px] px-5 py-14">
+      <div className="card p-7">
+        <Logo size={28} />
+        <Link href={`/login?next=${encodeURIComponent(sp.next ?? "/dashboard")}`} className="mt-6 inline-block text-[12.5px] font-bold text-muted hover:text-ink">
+          ← {t(locale, "changeNumber")}
+        </Link>
+        <h1 className="mt-2 text-[26px] font-extrabold tracking-tight">{t(locale, "enterCode")}</h1>
+        <p className="num mt-1.5 text-[13.5px] text-muted">
+          {t(locale, "sentTo")} <span className="text-ink">{sp.phone}</span>
+        </p>
+        <form method="post" action="/api/auth/verify" className="mt-7 space-y-4">
+          <input type="hidden" name="phone" value={sp.phone ?? ""} />
+          <input type="hidden" name="next" value={sp.next ?? "/dashboard"} />
           <input
             name="code"
             inputMode="numeric"
@@ -21,15 +28,19 @@ export default async function VerifyPage({ searchParams }: { searchParams: Promi
             maxLength={6}
             required
             autoFocus
-            className="num mt-1 w-full rounded border border-line bg-bg-2 px-3 py-2.5 text-center text-2xl tracking-[0.4em] text-ink outline-none focus:border-gold"
+            autoComplete="one-time-code"
+            className="num h-14 w-full rounded-xl border border-white/10 bg-bg-2 text-center text-[28px] tracking-[0.5em] text-ink outline-none focus:border-green"
           />
-        </label>
-        {sp.dev && <p className="num text-xs text-gold">dev code: {sp.dev}</p>}
-        {sp.error && <p className="text-sm text-down">{sp.error}</p>}
-        <button type="submit" className="w-full rounded bg-gold px-4 py-2.5 font-medium text-black hover:bg-gold-2">
-          {t(locale, "verify")}
-        </button>
-      </form>
+          {sp.dev && <p className="num text-[12px] text-green">dev code: {sp.dev}</p>}
+          {sp.error && <p className="text-[13px] text-red">{sp.error}</p>}
+          <Button size="lg" className="w-full">{t(locale, "verifyContinue")}</Button>
+        </form>
+        <form method="post" action="/api/auth/request" className="mt-4 text-[12.5px] text-muted">
+          <input type="hidden" name="phone" value={sp.phone ?? ""} />
+          <input type="hidden" name="next" value={sp.next ?? "/dashboard"} />
+          <button className="font-bold text-ink-2 hover:text-ink">{t(locale, "didntGet")}</button>
+        </form>
+      </div>
     </div>
   );
 }

@@ -27,16 +27,16 @@ export default async function Admin() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-12">
-      <h1 className="font-display text-3xl font-semibold">Admin</h1>
+      <h1 className="text-[28px] font-extrabold tracking-tight">Admin</h1>
       <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
         {Object.entries(row).map(([k, v]) => (
-          <div key={k} className="rounded-lg border border-line bg-surface p-4">
+          <div key={k} className="card p-4">
             <div className="text-[11px] uppercase tracking-[0.14em] text-muted">{k.replace("_", " ")}</div>
             <div className="num mt-1 text-2xl">{v}</div>
           </div>
         ))}
       </div>
-      <h2 className="font-display mt-10 text-xl font-semibold">Provider usage</h2>
+      <h2 className="mt-10 text-[18px] font-extrabold">Provider usage</h2>
       <table className="num mt-3 w-full text-sm">
         <tbody>
           {usage.map((u) => (
@@ -45,12 +45,12 @@ export default async function Admin() {
               <td className="py-2">{u.provider}</td>
               <td className="py-2 text-right">{u.requests} req</td>
               <td className="py-2 text-right">{u.credits} cr</td>
-              <td className="py-2 text-right text-down">{u.lastError ?? ""}</td>
+              <td className="py-2 text-right text-red">{u.lastError ?? ""}</td>
             </tr>
           ))}
         </tbody>
       </table>
-      <h2 className="font-display mt-10 text-xl font-semibold">Recent analyses</h2>
+      <h2 className="mt-10 text-[18px] font-extrabold">Recent analyses</h2>
       <table className="num mt-3 w-full text-sm">
         <tbody>
           {recentAnalyses.map((a) => (

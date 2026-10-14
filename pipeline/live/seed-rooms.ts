@@ -14,7 +14,7 @@ export async function seedRooms() {
         nameEn: r.nameEn,
         nameAm: r.nameAm,
         persona: r.persona,
-        strategyConfig: { markets: r.markets, maxTipsPerDay: r.maxTipsPerDay, minEvidence: r.minEvidence },
+        strategyConfig: { markets: r.markets, maxTipsPerDay: r.maxTipsPerDay, minEvidence: r.minEvidence, tag: r.tag, rules: r.rules },
         priceEtb: price,
       })
       .onConflictDoUpdate({

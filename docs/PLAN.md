@@ -442,3 +442,16 @@ Pipeline steps added to `pnpm live:daily`: `deliver` (after publish), `results` 
 
 Setup still needed: a BotFather token, the channel ids, and an AfroMessage account
 (token, identifier, sender name). Everything runs in mock mode until then.
+
+## 20. UI redesign (2026-10-14)
+
+The site now follows the final UI spec: near-black shell (#0b0c0f), one green accent
+(#3ddc84), Manrope for text and Geist Mono for numbers, Noto Sans Ethiopic in Amharic, and a
+two-letter colour mark per room as the only other colour. Public visitors get a top nav and
+landing page (hero, locked "Today's picks" card, live leaderboard with equity sparklines,
+room cards, how-it-works). Signed-in users get an app shell with a left sidebar, search bar
+and, on phones, a bottom tab bar. Pages: leaderboard with summary cards, rooms with filters,
+room detail (stats, equity curve, "how this room decides", sticky subscribe bar on mobile),
+tip verification (lead time, hash, model vs market chips), dashboard (greeting, today's
+picks, rooms, 7-day results, renewal nudge, delivery settings), checkout with 30/90-day
+plans, phone + OTP login, how-it-works with an on-page index and a tip checker, and search.

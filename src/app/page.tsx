@@ -1,99 +1,126 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { IconBrain, IconData, IconHash, IconLayers, IconLock, IconShield } from "@/components/icons";
 import { LeaderboardTable } from "@/components/leaderboard-table";
 import { RoomCard } from "@/components/room-card";
-import { TipCard } from "@/components/tip-card";
+import { Button, Chip, Eyebrow, PillTabs, SectionTitle } from "@/components/ui";
+import { fmtTime } from "@/lib/format";
 import { getLocale, t } from "@/lib/i18n";
-import { activeRoomIds, canViewTip, getLatestPublicTips, getLeaderboard, getRooms } from "@/lib/queries";
+import { getLeaderboard, getRooms, getTodayPublicPicks, PERIODS, type Period } from "@/lib/queries";
 import { getSessionUserId } from "@/lib/session";
 
-export default async function Home() {
+export const metadata = { title: "HabeshaTips" };
+
+export default async function Home({ searchParams }: { searchParams: Promise<{ period?: string }> }) {
+  if (await getSessionUserId()) redirect("/dashboard");
   const locale = await getLocale();
-  const uid = await getSessionUserId();
-  const [live, backtest, rooms, latest, subscribed] = await Promise.all([getLeaderboard("all"), getLeaderboard("backtest"), getRooms(), getLatestPublicTips(6), activeRoomIds(uid)]);
+  const sp = await searchParams;
+  const period = (PERIODS.includes(sp.period as Period) && sp.period !== "backtest" ? sp.period : "all") as Period;
+  const [live, backtest, rooms, picks] = await Promise.all([getLeaderboard(period), getLeaderboard("backtest"), getRooms(), getTodayPublicPicks()]);
   const hasLive = live.some((r) => r.stats.tips > 0);
   const board = hasLive ? live : backtest;
-  const settledTotal = board.reduce((s, r) => s + r.stats.tips, 0);
+  const equity = new Map(rooms.map((r) => [r.room.id, r.equity]));
+  const settled = board.reduce((s, r) => s + r.stats.tips, 0);
+  const minPrice = Math.min(...rooms.map((r) => r.room.priceEtb).filter((p) => p > 0), 199);
+
+  const steps = [
+    { icon: <IconData />, title: "Data", body: "Fixtures, results, standings and bookmaker odds for the big five leagues and the Champions League, pulled every morning from several sources." },
+    { icon: <IconBrain />, title: "Model + analysis", body: "A goal model refitted daily is blended with the market, then Claude writes the reasoning in English and Amharic." },
+    { icon: <IconLayers />, title: "Rooms", body: "Six fixed rule sets read the same analysis. Each has a probability floor, an odds range and a daily cap. Silence is a valid output." },
+    { icon: <IconHash />, title: "Hashed before kickoff", body: "Every pick is written with its odds, a UTC timestamp and a SHA-256 hash. Nothing is backfilled." },
+    { icon: <IconShield />, title: "Settled in public", body: "Results are settled at the published odds with flat one-unit stakes. The leaderboard is arithmetic over that record." },
+  ];
 
   return (
     <div>
-      <section className="relative overflow-hidden border-b border-line">
-        <div className="grid-lines absolute inset-0 -z-10 opacity-60" />
-        <div className="mx-auto grid max-w-6xl gap-10 px-4 py-16 md:grid-cols-[1.1fr_1fr] md:py-24">
+      <section className="mx-auto max-w-[1240px] px-5 pb-10 pt-14 md:pt-20">
+        <div className="grid items-start gap-10 lg:grid-cols-[1.15fr_0.85fr]">
           <div className="rise">
-            <div className="mb-4 inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-gold">
-              <span className="h-1.5 w-1.5 rounded-full bg-gold" /> Big five leagues + Champions League
+            <Chip tone="green">{t(locale, "heroPill")}</Chip>
+            <h1 className="mt-5 text-[40px] font-extrabold leading-[1.02] tracking-tight md:text-[60px]">
+              {t(locale, "tagline1")}
+              <br />
+              <span className="text-green">{t(locale, "tagline2")}</span>
+            </h1>
+            <p className="mt-5 max-w-[520px] text-[16px] leading-relaxed text-ink-2 md:text-[17px]">{t(locale, "heroSub")}</p>
+            <div className="mt-7 flex flex-wrap gap-3">
+              <Button href="/login?next=/dashboard" size="lg">{t(locale, "seePicks")}</Button>
+              <Button href="/how-it-works" variant="outline" size="lg">{t(locale, "howItWorks")}</Button>
             </div>
-            <h1 className="font-display text-4xl font-semibold leading-[1.05] md:text-6xl">{t(locale, "tagline")}</h1>
-            <p className="mt-5 max-w-lg text-base leading-relaxed text-ink-2 md:text-lg">{t(locale, "heroSub")}</p>
-            <div className="mt-8 flex flex-wrap items-center gap-3">
-              <Link href="/rooms" className="rounded bg-gold px-5 py-2.5 font-medium text-black hover:bg-gold-2">
-                {t(locale, "rooms")} →
-              </Link>
-              <Link href="/how-it-works" className="rounded border border-line-2 px-5 py-2.5 text-ink-2 hover:border-ink-2 hover:text-ink">
-                {t(locale, "howItWorks")}
-              </Link>
-            </div>
-            <dl className="mt-10 grid max-w-md grid-cols-3 gap-6 border-t border-line pt-6">
+            <dl className="mt-10 flex flex-wrap gap-10">
               <div>
-                <dt className="text-[11px] uppercase tracking-[0.14em] text-muted">{t(locale, "rooms")}</dt>
-                <dd className="num mt-1 text-2xl">{rooms.length}</dd>
+                <dd className="num text-[28px] font-bold">{settled.toLocaleString()}</dd>
+                <dt className="text-[12px] font-medium text-muted">{t(locale, "tipsSettled")}</dt>
               </div>
               <div>
-                <dt className="text-[11px] uppercase tracking-[0.14em] text-muted">{t(locale, "settledPublicly")}</dt>
-                <dd className="num mt-1 text-2xl">{settledTotal.toLocaleString()}</dd>
+                <dd className="num text-[28px] font-bold">{rooms.length}</dd>
+                <dt className="text-[12px] font-medium text-muted">{t(locale, "strategyRooms")}</dt>
               </div>
               <div>
-                <dt className="text-[11px] uppercase tracking-[0.14em] text-muted">Leagues</dt>
-                <dd className="num mt-1 text-2xl">6</dd>
+                <dd className="num text-[28px] font-bold">06:00</dd>
+                <dt className="text-[12px] font-medium text-muted">{t(locale, "publishedDaily")}</dt>
               </div>
             </dl>
           </div>
-          <div className="rise rise-2">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="font-display text-lg font-semibold">{t(locale, "leaderboard")}</h2>
-              <Link href="/leaderboard" className="text-sm text-gold hover:underline">{t(locale, "seeAll")} →</Link>
+
+          <div className="card rise p-5 lg:mt-6">
+            <div className="flex items-center justify-between">
+              <div className="text-[15px] font-extrabold">
+                {t(locale, "todaysPicks")} <span className="num ml-1 text-[12px] font-medium text-muted">{new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Addis_Ababa", weekday: "short", day: "numeric", month: "short" }).format(new Date())}</span>
+              </div>
+              {picks.publishedAt && <span className="num text-[11px] text-muted">{t(locale, "published")} {fmtTime(picks.publishedAt)}</span>}
             </div>
-            <LeaderboardTable rows={board} locale={locale} period={hasLive ? "all" : "backtest"} compact />
+            {picks.first ? (
+              <>
+                <div className="mt-4 flex items-center justify-between gap-3 rounded-xl bg-surface-3 px-4 py-3">
+                  <div className="min-w-0">
+                    <div className="truncate text-[15px] font-extrabold">
+                      {picks.first.home} <span className="text-muted">v</span> {picks.first.away}
+                    </div>
+                    <div className="text-[11.5px] text-muted">{picks.first.leagueName} · {fmtTime(picks.first.kickoffAt)} EAT</div>
+                  </div>
+                  <span className="num flex items-center gap-1 rounded-md border border-white/10 px-2 py-1 text-[12px] font-bold text-ink">
+                    <IconLock size={12} /> @ •.••
+                  </span>
+                </div>
+                <div className="mt-3 flex items-center justify-between text-[12.5px]">
+                  <span className="text-muted">{t(locale, "morePicks", { n: Math.max(0, picks.count - 1) })}</span>
+                  <Link href="/rooms" className="font-bold text-green hover:underline">{t(locale, "unlockFrom", { price: minPrice })}</Link>
+                </div>
+              </>
+            ) : (
+              <div className="mt-4 rounded-xl bg-surface-3 px-4 py-5 text-[13px] text-muted">{t(locale, "noPicksYet")}</div>
+            )}
           </div>
         </div>
       </section>
 
-      <section className="mx-auto max-w-6xl px-4 py-14">
-        <div className="mb-6 flex items-end justify-between">
-          <h2 className="font-display text-2xl font-semibold">{t(locale, "rooms")}</h2>
-          <span className="text-sm text-muted">{t(locale, "aiLabel")}</span>
-        </div>
+      <section className="mx-auto max-w-[1240px] px-5 py-10">
+        <SectionTitle
+          title={t(locale, "liveLeaderboard")}
+          sub={`${t(locale, "roiFormula")} ${hasLive ? "" : t(locale, "backtestShown")}`}
+          action={<PillTabs items={[{ href: "/?period=all", label: t(locale, "period_all"), active: period === "all" }, { href: "/?period=30d", label: t(locale, "period_30d"), active: period === "30d" }, { href: "/?period=7d", label: t(locale, "period_7d"), active: period === "7d" }]} />}
+        />
+        <LeaderboardTable rows={board} equity={equity} locale={locale} period={hasLive ? period : "backtest"} />
+      </section>
+
+      <section className="mx-auto max-w-[1240px] px-5 py-10" id="rooms">
+        <SectionTitle title={t(locale, "sixRooms")} sub={t(locale, "sixRoomsSub")} action={<Link href="/rooms" className="text-[13px] font-bold text-ink-2 hover:text-ink">{t(locale, "allRooms")} →</Link>} />
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {rooms.map((r) => (
-            <RoomCard key={r.room.id} {...r} locale={locale} />
+            <RoomCard key={r.room.id} room={r.room} live={r.live} backtest={r.backtest} locale={locale} variant="landing" />
           ))}
         </div>
       </section>
 
-      {latest.length > 0 && (
-        <section className="border-t border-line bg-bg-2">
-          <div className="mx-auto max-w-6xl px-4 py-14">
-            <h2 className="font-display mb-6 text-2xl font-semibold">{t(locale, "recentTips")}</h2>
-            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-              {latest.map((tip) => (
-                <TipCard key={tip.id} tip={tip} locale={locale} locked={!canViewTip(tip, subscribed)} />
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-
-      <section className="border-t border-line">
-        <div className="mx-auto grid max-w-6xl gap-8 px-4 py-14 md:grid-cols-3">
-          {[
-            ["01", "Published before kickoff", "Each pick is written to the record with a UTC timestamp and the odds at that moment. Nothing is backfilled."],
-            ["02", "Hashed and public", "Every tip carries a SHA-256 hash over room, match, market, pick, odds and time. Anyone can open the tip page and check it."],
-            ["03", "Settled in the open", "Results are settled at the published odds with flat one-unit stakes. ROI on the leaderboard is just arithmetic over that record."],
-          ].map(([n, h, p]) => (
-            <div key={n} className="rise rise-3">
-              <div className="num text-sm text-gold">{n}</div>
-              <h3 className="font-display mt-2 text-lg font-semibold">{h}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-ink-2">{p}</p>
+      <section className="mx-auto max-w-[1240px] px-5 py-10">
+        <Eyebrow className="mb-4">{t(locale, "howItWorks")}</Eyebrow>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+          {steps.map((s) => (
+            <div key={s.title} className="card p-5">
+              <span className="grid h-10 w-10 place-items-center rounded-[11px] bg-surface-3 text-green">{s.icon}</span>
+              <h3 className="mt-4 text-[15px] font-extrabold">{s.title}</h3>
+              <p className="mt-2 text-[12.5px] leading-relaxed text-ink-2">{s.body}</p>
             </div>
           ))}
         </div>

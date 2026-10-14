@@ -1,4 +1,5 @@
-import Link from "next/link";
+import { Button } from "@/components/ui";
+import { getLocale, t } from "@/lib/i18n";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { payments } from "@/db/schema";
@@ -20,8 +21,9 @@ export default async function CheckoutReturn({ searchParams }: { searchParams: P
     } else if (chapaConfigured()) {
       const v = await verifyPayment(tx_ref);
       if (v.success && Math.round(v.amount) >= p.amountEtb) {
-        const roomId = (p.rawWebhook as { roomId?: string } | null)?.roomId;
-        if (roomId) await activateFromPayment(p.id, roomId, v.raw);
+        const meta = p.rawWebhook as { roomId?: string; days?: number } | null;
+        const days = meta?.days === 90 ? 90 : 30;
+        if (meta?.roomId) await activateFromPayment(p.id, meta.roomId, { verify: v.raw, roomId: meta.roomId, days }, days);
         ok = true;
         message = "Payment confirmed.";
       } else {
@@ -29,13 +31,12 @@ export default async function CheckoutReturn({ searchParams }: { searchParams: P
       }
     }
   }
+  const locale = await getLocale();
   return (
-    <div className="mx-auto max-w-md px-4 py-16 text-center">
-      <div className={`num text-5xl ${ok ? "text-up" : "text-gold"}`}>{ok ? "✓" : "…"}</div>
-      <h1 className="font-display mt-4 text-2xl font-semibold">{message}</h1>
-      <Link href="/dashboard" className="mt-6 inline-block rounded bg-gold px-4 py-2 font-medium text-black hover:bg-gold-2">
-        Dashboard →
-      </Link>
+    <div className="mx-auto max-w-md py-10 text-center">
+      <div className={`mx-auto grid h-14 w-14 place-items-center rounded-full ${ok ? "bg-green text-on-green" : "bg-surface-3 text-amber"} text-2xl font-extrabold`}>{ok ? "✓" : "…"}</div>
+      <h1 className="mt-5 text-[24px] font-extrabold tracking-tight">{ok ? t(locale, "paymentConfirmed") : message}</h1>
+      <Button href="/dashboard" className="mt-6">{t(locale, "dashboard")} →</Button>
     </div>
   );
 }

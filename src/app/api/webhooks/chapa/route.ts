@@ -20,10 +20,12 @@ export async function GET(req: Request) {
 async function settleByVerification(txRef: string, context: Record<string, unknown>) {
   const [p] = await db.select().from(payments).where(eq(payments.txRef, txRef));
   if (!p || p.status === "success") return;
-  const roomId = (p.rawWebhook as { roomId?: string } | null)?.roomId;
+  const meta = p.rawWebhook as { roomId?: string; days?: number } | null;
+  const roomId = meta?.roomId;
+  const days = meta?.days === 90 ? 90 : 30;
   const v = await verifyPayment(txRef);
   if (v.success && Math.round(v.amount) >= p.amountEtb) {
-    if (roomId) await activateFromPayment(p.id, roomId, { ...context, verify: v.raw, roomId });
+    if (roomId) await activateFromPayment(p.id, roomId, { ...context, verify: v.raw, roomId, days }, days);
   } else if ((v.raw as { data?: { status?: string } })?.data?.status === "failed") {
     await db.update(payments).set({ status: "failed", rawWebhook: { ...context, verify: v.raw, roomId } }).where(eq(payments.id, p.id));
   }

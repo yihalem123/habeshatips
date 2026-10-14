@@ -48,10 +48,14 @@ export interface Room {
   nameEn: string;
   nameAm: string;
   persona: string;
+  /** One-line tag shown on cards. */
+  tag: string;
   markets: Market[];
   maxTipsPerDay: number;
   /** Minimum decay-weighted evidence on both teams before the room will tip a match. */
   minEvidence: number;
+  /** Human-readable rules, shown on the room page. Keep in sync with select(). */
+  rules: { label: string; value: string }[];
   select(ctx: MatchContext): Candidate | null;
 }
 
@@ -104,6 +108,8 @@ export const ROOMS: Room[] = [
     nameEn: "Safe Bet",
     nameAm: "አስተማማኝ ምርጫ",
     persona: "Calm, conservative, favors clear favorites and skips coin-flips.",
+    tag: "Clear favorites only. Many days it says nothing.",
+    rules: [{ label: "Model probability", value: "≥ 62%" }, { label: "Odds range", value: "1.25 – 1.65" }, { label: "Edge vs market", value: "≥ −3 pts" }, { label: "Evidence per team", value: "≥ 8 matches" }],
     markets: ["1X2"],
     maxTipsPerDay: 3,
     minEvidence: 8,
@@ -121,6 +127,8 @@ export const ROOMS: Room[] = [
     nameEn: "Value Hunter",
     nameAm: "ዋጋ አዳኝ",
     persona: "Analytical contrarian; only bets where the price is wrong.",
+    tag: "Only bets where the price is wrong.",
+    rules: [{ label: "Expected value", value: "≥ +5%" }, { label: "Odds range", value: "1.80 – 3.60" }, { label: "Evidence per team", value: "≥ 10 matches" }],
     markets: ["1X2"],
     maxTipsPerDay: 3,
     minEvidence: 10,
@@ -137,6 +145,8 @@ export const ROOMS: Room[] = [
     nameEn: "Goal Rush",
     nameAm: "የጎል ዝናብ",
     persona: "Loves open games; looks for two attacking sides and leaky defenses.",
+    tag: "Open games, both sides scoring.",
+    rules: [{ label: "Expected goals", value: "≥ 2.9" }, { label: "Over 2.5 probability", value: "≥ 58%" }, { label: "BTTS probability", value: "≥ 60%" }, { label: "Edge vs market", value: "≥ +2 pts" }, { label: "Evidence per team", value: "≥ 8 matches" }],
     markets: ["OU25", "BTTS"],
     maxTipsPerDay: 3,
     minEvidence: 8,
@@ -155,6 +165,8 @@ export const ROOMS: Room[] = [
     nameEn: "Lockdown",
     nameAm: "ቁልፍ መከላከያ",
     persona: "Patient and defensive; backs tight, low-scoring matches.",
+    tag: "Tight, low-scoring matches.",
+    rules: [{ label: "Expected goals", value: "≤ 2.35" }, { label: "Under 2.5 probability", value: "≥ 56%" }, { label: "BTTS-no probability", value: "≥ 58%" }, { label: "Edge vs market", value: "≥ +2 pts" }, { label: "Evidence per team", value: "≥ 8 matches" }],
     markets: ["OU25", "BTTS"],
     maxTipsPerDay: 3,
     minEvidence: 8,
@@ -173,6 +185,8 @@ export const ROOMS: Room[] = [
     nameEn: "Home Fortress",
     nameAm: "የቤት ምሽግ",
     persona: "Backs strong home sides in good home form against travel-sick visitors.",
+    tag: "Strong home sides against poor travellers.",
+    rules: [{ label: "Home win probability", value: "≥ 52%" }, { label: "Odds range", value: "1.35 – 2.20" }, { label: "Home form (last 5 home)", value: "≥ 1.8 ppg" }, { label: "Away form (last 5 away)", value: "≤ 1.6 ppg" }, { label: "Evidence per team", value: "≥ 8 matches" }],
     markets: ["1X2"],
     maxTipsPerDay: 3,
     minEvidence: 8,
@@ -191,6 +205,8 @@ export const ROOMS: Room[] = [
     nameEn: "Draw Master",
     nameAm: "የአቻ ጌታ",
     persona: "Specialist in stalemates: evenly matched, cautious teams.",
+    tag: "Evenly matched, cautious teams.",
+    rules: [{ label: "Draw probability", value: "≥ 30%" }, { label: "Draw odds", value: "≥ 3.00" }, { label: "Edge vs market", value: "≥ +2 pts" }, { label: "Balance |P(home) − P(away)|", value: "≤ 0.20" }, { label: "Evidence per team", value: "≥ 10 matches" }],
     markets: ["1X2"],
     maxTipsPerDay: 2,
     minEvidence: 10,

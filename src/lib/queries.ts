@@ -252,3 +252,162 @@ export async function getLatestPublicTips(limit = 8): Promise<TipView[]> {
     .limit(limit);
   return rows.map((r) => toTipView(r.tips, r.fixtures, r.rooms));
 }
+
+// ---- Additions for the redesigned UI ------------------------------------------------
+
+export interface RoomStatsFull extends Stats {
+  avgOdds: number;
+  maxDrawdown: number;
+  longestLosingStreak: number;
+}
+
+/** Stats computed straight from settled tips (live when any, else backtest). */
+export async function roomStatsFromTips(roomId: string, backtest: boolean): Promise<RoomStatsFull> {
+  const rows = await db
+    .select({ result: tips.result, profit: tips.profitUnits, odds: tips.oddsAtPublish, settledAt: tips.settledAt })
+    .from(tips)
+    .where(and(eq(tips.roomId, roomId), eq(tips.isBacktest, backtest), ...(backtest ? [] : [eq(tips.basis, PUBLIC_BASIS)]), inArray(tips.result, ["win", "loss"])))
+    .orderBy(tips.publishedAt);
+  let wins = 0;
+  let profit = 0;
+  let oddsSum = 0;
+  let peak = 0;
+  let dd = 0;
+  let streak = 0;
+  let longest = 0;
+  let last: Date | null = null;
+  for (const r of rows) {
+    const p = Number(r.profit ?? 0);
+    profit += p;
+    oddsSum += Number(r.odds);
+    if (r.result === "win") {
+      wins++;
+      streak = 0;
+    } else {
+      streak++;
+      longest = Math.max(longest, streak);
+    }
+    peak = Math.max(peak, profit);
+    dd = Math.max(dd, peak - profit);
+    if (r.settledAt && (!last || r.settledAt > last)) last = r.settledAt;
+  }
+  const n = rows.length;
+  return { tips: n, wins, winRate: n ? wins / n : 0, profit, roi: n ? profit / n : 0, computedAt: last, avgOdds: n ? oddsSum / n : 0, maxDrawdown: dd, longestLosingStreak: longest };
+}
+
+export interface LeaderboardSummary {
+  settledTips: number;
+  best: { room: RoomRow; roi: number; tips: number } | null;
+  lastSettledAt: Date | null;
+  isBacktest: boolean;
+}
+
+export async function getLeaderboardSummary(period: Period): Promise<LeaderboardSummary> {
+  const rows = await getLeaderboard(period);
+  const withTips = rows.filter((r) => r.stats.tips > 0);
+  const best = withTips.sort((x, y) => y.stats.roi - x.stats.roi)[0];
+  const [last] = await db
+    .select({ settledAt: tips.settledAt })
+    .from(tips)
+    .where(and(eq(tips.isBacktest, period === "backtest"), ne(tips.result, "pending")))
+    .orderBy(desc(tips.settledAt))
+    .limit(1);
+  return {
+    settledTips: rows.reduce((s, r) => s + r.stats.tips, 0),
+    best: best ? { room: best.room, roi: best.stats.roi, tips: best.stats.tips } : null,
+    lastSettledAt: last?.settledAt ?? null,
+    isBacktest: period === "backtest",
+  };
+}
+
+/** Today's (and tomorrow's) pending public picks across all rooms, for the landing card. */
+export async function getTodayPublicPicks(): Promise<{ count: number; first: TipView | null; publishedAt: Date | null }> {
+  const start = new Date();
+  start.setUTCHours(0, 0, 0, 0);
+  const end = new Date(start.getTime() + 2 * 86_400_000);
+  const rows = await db
+    .select()
+    .from(tips)
+    .innerJoin(fixtures, eq(tips.fixtureId, fixtures.id))
+    .innerJoin(rooms, eq(tips.roomId, rooms.id))
+    .where(and(eq(tips.basis, PUBLIC_BASIS), eq(tips.isBacktest, false), eq(tips.result, "pending"), gte(fixtures.kickoffAt, start), lt(fixtures.kickoffAt, end)))
+    .orderBy(fixtures.kickoffAt);
+  const first = rows[0] ? toTipView(rows[0].tips, rows[0].fixtures, rows[0].rooms) : null;
+  return { count: rows.length, first, publishedAt: first?.publishedAt ?? null };
+}
+
+export async function getRecentResults(roomIds: Set<string>, days = 7): Promise<{ tips: TipView[]; profit: number; wins: number; losses: number }> {
+  if (roomIds.size === 0) return { tips: [], profit: 0, wins: 0, losses: 0 };
+  const since = new Date(Date.now() - days * 86_400_000);
+  const rows = await db
+    .select()
+    .from(tips)
+    .innerJoin(fixtures, eq(tips.fixtureId, fixtures.id))
+    .innerJoin(rooms, eq(tips.roomId, rooms.id))
+    .where(and(inArray(tips.roomId, Array.from(roomIds)), eq(tips.basis, PUBLIC_BASIS), eq(tips.isBacktest, false), inArray(tips.result, ["win", "loss", "void"]), gte(tips.settledAt, since)))
+    .orderBy(desc(tips.settledAt));
+  const views = rows.map((r) => toTipView(r.tips, r.fixtures, r.rooms));
+  return {
+    tips: views,
+    profit: views.reduce((s, t) => s + (t.profit ?? 0), 0),
+    wins: views.filter((t) => t.result === "win").length,
+    losses: views.filter((t) => t.result === "loss").length,
+  };
+}
+
+export interface TipContext {
+  modelProb: number | null;
+  marketProb: number | null;
+  homePpg: number | null;
+  awayPpg: number | null;
+  injuryFeedAvailable: boolean;
+}
+
+/** Model-vs-market and form chips for the tip page, from the analysis that produced it. */
+export async function getTipContext(tipId: string): Promise<TipContext | null> {
+  const { matchAnalyses } = await import("@/db/schema");
+  const [row] = await db
+    .select({ features: matchAnalyses.features, market: tips.market, selection: tips.selection, modelProb: tips.modelProb })
+    .from(tips)
+    .innerJoin(matchAnalyses, eq(tips.analysisId, matchAnalyses.id))
+    .where(eq(tips.id, tipId));
+  if (!row) return null;
+  const f = row.features as { packet?: { implied?: { h: number; d: number; a: number; over25: number | null } | null; form?: { home?: { homePpg?: number }; away?: { awayPpg?: number } }; injuryFeedAvailable?: boolean } } | null;
+  const imp = f?.packet?.implied ?? null;
+  let marketProb: number | null = null;
+  if (imp) {
+    if (row.market === "1X2") marketProb = row.selection === "H" ? imp.h : row.selection === "D" ? imp.d : imp.a;
+    else if (row.market === "OU25" && imp.over25 !== null) marketProb = row.selection === "O" ? imp.over25 : 1 - imp.over25;
+  }
+  return {
+    modelProb: Number(row.modelProb),
+    marketProb,
+    homePpg: f?.packet?.form?.home?.homePpg ?? null,
+    awayPpg: f?.packet?.form?.away?.awayPpg ?? null,
+    injuryFeedAvailable: f?.packet?.injuryFeedAvailable ?? false,
+  };
+}
+
+export async function getExpiringSubscription(userId: string, withinDays = 3) {
+  const rows = await getUserSubscriptions(userId);
+  const now = Date.now();
+  return rows
+    .filter((r) => r.active && r.sub.endsAt.getTime() - now < withinDays * 86_400_000)
+    .sort((x, y) => x.sub.endsAt.getTime() - y.sub.endsAt.getTime())[0] ?? null;
+}
+
+export async function searchAll(q: string): Promise<{ rooms: RoomRow[]; tips: TipView[] }> {
+  const { ilike, or } = await import("drizzle-orm");
+  const term = `%${q.trim()}%`;
+  if (q.trim().length < 2) return { rooms: [], tips: [] };
+  const roomRows = await db.select().from(rooms).where(or(ilike(rooms.nameEn, term), ilike(rooms.slug, term), ilike(rooms.nameAm, term))!);
+  const tipRows = await db
+    .select()
+    .from(tips)
+    .innerJoin(fixtures, eq(tips.fixtureId, fixtures.id))
+    .innerJoin(rooms, eq(tips.roomId, rooms.id))
+    .where(and(eq(tips.basis, PUBLIC_BASIS), or(ilike(fixtures.home, term), ilike(fixtures.away, term), ilike(fixtures.leagueName, term))!))
+    .orderBy(desc(tips.publishedAt))
+    .limit(30);
+  return { rooms: roomRows, tips: tipRows.map((r) => toTipView(r.tips, r.fixtures, r.rooms)) };
+}

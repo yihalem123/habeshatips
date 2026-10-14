@@ -6,7 +6,8 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import { closeDb, db, schema } from "./db";
-import { LEAGUES } from "../data/football-data";
+import { LEAGUES, loadSeasons, type LeagueCode } from "../data/football-data";
+import { eq } from "drizzle-orm";
 import type { TipRecord } from "../backtest/run";
 import { tipHash } from "./publish";
 
@@ -14,10 +15,16 @@ export async function importBacktest(file: string) {
   const report = JSON.parse(fs.readFileSync(file, "utf8")) as { params: { season: string }; tips: TipRecord[] };
   const rooms = await db.select().from(schema.rooms);
   const roomId = new Map(rooms.map((r) => [r.slug, r.id]));
+  // Final scores from the CSVs, so settled backtest rows show the result like live ones.
+  const scores = new Map<string, { hg: number; ag: number }>();
+  for (const m of loadSeasons(Object.keys(LEAGUES) as LeagueCode[], [report.params.season])) {
+    scores.set(`${m.league}|${m.date.toISOString().slice(0, 10)}|${m.home}|${m.away}`, { hg: m.hg, ag: m.ag });
+  }
   let n = 0;
   for (const t of report.tips) {
     const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-");
     const fixtureId = `bt-${t.league}-${t.date}-${slug(t.home)}-${slug(t.away)}`;
+    const score = scores.get(`${t.league}|${t.date}|${t.home}|${t.away}`);
     await db
       .insert(schema.fixtures)
       .values({
@@ -30,8 +37,16 @@ export async function importBacktest(file: string) {
         away: t.away,
         kickoffAt: new Date(`${t.date}T15:00:00Z`),
         status: "finished",
+        homeGoals: score?.hg ?? null,
+        awayGoals: score?.ag ?? null,
       })
       .onConflictDoNothing();
+    if (score) {
+      await db
+        .update(schema.fixtures)
+        .set({ homeGoals: score.hg, awayGoals: score.ag })
+        .where(eq(schema.fixtures.id, fixtureId));
+    }
     const publishedAt = new Date(`${t.date}T08:00:00Z`);
     const res = await db
       .insert(schema.tips)
